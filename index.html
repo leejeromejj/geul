@@ -70,6 +70,14 @@ textarea:focus,.ttl:focus{border-color:var(--fg)}
 .cal .d.has::after{content:'';position:absolute;bottom:5px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:currentColor}
 .cal .d:disabled{opacity:.28;cursor:default}
 button.av{border:0;color:inherit;cursor:pointer}
+.pv{display:block;max-width:100%;max-height:220px;border-radius:12px;margin-top:10px}
+.pv[hidden]{display:none}
+.ph{display:block;max-width:100%;border-radius:12px;margin-top:8px}
+.pr{display:flex;gap:14px;align-items:center;margin-top:6px}
+.post .pr button{margin:0;font-size:13px}
+.post .pr .hb{font-size:15px}
+.post .pr .hb.on{color:#E5484D}
+.dh{margin:22px 0 4px}
 </style>
 </head>
 <body>
@@ -219,36 +227,30 @@ const XW=[
 ];
 XW.forEach((r,i)=>WRITE.push({k:'x'+i,len:r[0],p:r[1]}));
 const CONTEST=[
-['학교 이름','외계의 침략으로 지구에 영웅을 양성하는 학교가 세워졌습니다. 학교 이름을 지어 주세요.'],
-['가게 이름','달에 처음 생긴 편의점입니다. 가게 이름과 간판 문구를 지어 주세요.'],
-['작품 제목','2036년 넷플릭스 1위 작품이 공개됐습니다. 제목과 한 줄 소개를 지어 주세요.'],
-['카페 메뉴','조선시대에 카페가 문을 열었습니다. 시그니처 메뉴의 이름과 설명을 지어 주세요.'],
-['신제품','먹으면 월요일 출근이 즐거워지는 음료가 출시됩니다. 제품명과 광고 문구를 지어 주세요.'],
-['신조어','누구나 느끼지만 이름이 없던 감정이 있습니다. 이름과 뜻풀이를 지어 주세요.'],
-['새 속담','현대인을 위한 새 속담이 필요합니다. 하나 만들어 주세요.'],
-['동물원','고양이가 운영하는 동물원이 문을 열었습니다. 입장 안내문의 첫 줄을 써 주세요.'],
-['영화 제목','당신의 오늘 하루가 영화로 만들어집니다. 제목과 포스터 문구를 지어 주세요.'],
-['앱 이름','잠이 안 올 때 쓰는 앱이 출시됩니다. 앱 이름과 소개 문구를 지어 주세요.'],
-['라면 이름','우주에서 팔릴 첫 번째 라면이 나왔습니다. 이름과 맛 설명을 지어 주세요.'],
-['앨범','사랑에 빠진 로봇이 첫 앨범을 냈습니다. 타이틀곡 제목과 가사 첫 줄을 지어 주세요.'],
-['위로 가게','24시간 후회를 들어주는 가게가 생겼습니다. 가게 이름과 대표 메뉴를 지어 주세요.'],
-['동네 이름','지도에 없는 비밀 동네가 있습니다. 동네 이름과 유래를 지어 주세요.'],
-['헤드라인','내일 아침 신문 1면을 장식할 가장 평화로운 뉴스 제목을 지어 주세요.'],
-['히어로','평범한 직장인이 어느 날 초능력을 얻었습니다. 능력과 히어로 이름을 지어 주세요.'],
-['동네 모임','지구를 몰래 지키는 동네 모임이 있습니다. 모임 이름과 구호를 지어 주세요.'],
-['놀이기구','월요일을 테마로 한 놀이공원이 생겼습니다. 가장 무서운 놀이기구의 이름은?'],
-['책 제목','세상에서 가장 읽고 싶은 책이 나왔습니다. 제목과 첫 문장을 지어 주세요.'],
-['향수','추억의 냄새를 담은 향수가 출시됩니다. 향수 이름과 향 설명을 지어 주세요.'],
-['우산 광고','비 오는 날이 기다려지는 우산이 나왔습니다. 광고 문구를 지어 주세요.'],
-['치킨 신메뉴','새로운 치킨 맛이 출시됩니다. 메뉴 이름과 광고 문구를 지어 주세요.'],
-['말하는 화분','집에 있는 화분이 처음으로 말을 했습니다. 첫마디는 무엇이었을까요?'],
-['한마디','월요일 아침, 지친 친구에게 보낼 한마디를 지어 주세요.'],
-['대회 이름','세상에서 가장 쓸모없지만 가장 재밌는 대회가 열립니다. 대회 이름과 종목을 지어 주세요.'],
-['새 기념일','새로운 기념일이 생겼습니다. 날짜와 이름, 챙기는 방법을 지어 주세요.'],
-['식당 이름','사라진 것들만 파는 식당이 문을 열었습니다. 식당 이름과 메뉴를 지어 주세요.'],
-['AI 농담','AI가 인간에게 처음으로 농담을 했습니다. 어떤 농담이었을까요?'],
-['웹툰','내일부터 연재되는 인기 웹툰이 있습니다. 제목과 한 줄 소개를 지어 주세요.'],
-['직함','우리 집 반려동물에게 어울리는 거창한 직함과 별명을 지어 주세요.']
+['학교 이름','외계 함선이 서울 상공에 나타난 지 1년. 정부가 비밀리에 영웅 양성 학교를 세우고 신입생 모집 포스터를 붙이려 합니다. 학교 이름과 포스터 문구를 지어 주세요.'],
+['편의점','달에 24시간 편의점 1호점이 문을 엽니다. 손님은 우주비행사와 외계인 알바생뿐이고 도시락은 튜브형입니다. 가게 이름과 대표 상품 이름을 지어 주세요.'],
+['작품 제목','2036년, 넷플릭스 전 세계 1위를 8주째 지키는 한국 드라마가 있습니다. 주인공은 은퇴한 택배기사입니다. 제목과 한 줄 소개를 지어 주세요.'],
+['조선 카페','한양 종로에 최초의 카페가 문을 열었습니다. 양반과 보부상이 한 줄로 서 있습니다. 가게 이름과 시그니처 메뉴, 메뉴 설명을 지어 주세요.'],
+['신제품','월요일 아침에 마시면 출근길이 소풍처럼 느껴진다는 음료가 편의점에 입고됐습니다. 제품명과 병에 적힌 한 줄 문구를 지어 주세요.'],
+['신조어','지하철에서 내릴 역을 지나친 순간의 아찔함처럼, 모두가 겪지만 이름이 없는 감정이 있습니다. 하나를 골라 신조어와 뜻풀이, 예문을 지어 주세요.'],
+['새 속담','요즘은 야근이 너무 많아 옛 속담이 맞지 않는다고 합니다. “가는 말이 고와야 오는 말이 곱다”를 오늘의 직장 버전으로 고쳐 주세요.'],
+['고양이 동물원','고양이 열 마리가 직접 운영하는 동물원이 개장했습니다. 인간은 유료 관람객입니다. 입구에 붙은 이용 규칙 세 가지를 써 주세요.'],
+['영화 제목','당신의 오늘 하루를 다룬 영화가 개봉합니다. 장르는 알 수 없고 주연은 당신입니다. 영화 제목과 포스터 문구를 지어 주세요.'],
+['새벽 앱','새벽 세 시에만 켜지는 앱이 출시됩니다. 접속한 사람끼리 익명으로 위로를 주고받습니다. 앱 이름과 첫 화면 문구를 지어 주세요.'],
+['로봇 앨범','사랑에 빠진 로봇이 인간 몰래 첫 앨범을 냈습니다. 수록곡은 모두 배터리 잔량에 대한 노래입니다. 앨범 이름과 타이틀곡 제목, 가사 첫 줄을 지어 주세요.'],
+['후회 가게','밤 열두 시부터 새벽 여섯 시까지만 여는 가게에서는 손님의 후회를 들어주고 차를 내줍니다. 가게 이름과 메뉴판 첫 줄을 지어 주세요.'],
+['비밀 동네','지도 앱에는 나오지 않지만 마음이 지친 사람만 찾아갈 수 있는 동네가 있습니다. 동네 이름과 그 이름의 유래를 지어 주세요.'],
+['신문 1면','전 세계가 하루 동안 모든 싸움을 멈춘 다음 날입니다. 신문사 이름과 1면 헤드라인을 함께 지어 주세요.'],
+['히어로','평범한 직장인 김 대리가 야근 중 번개를 맞고 초능력을 얻었습니다. 능력이 너무 사소해서 아무도 쓸모를 모릅니다. 능력과 히어로 이름을 지어 주세요.'],
+['반상회','아파트 3동 주민들은 사실 매주 일요일마다 지구를 몰래 지키고 있습니다. 반상회로 위장 중입니다. 모임 이름과 구호를 지어 주세요.'],
+['놀이기구','월요일을 테마로 한 놀이공원이 개장했습니다. 가장 인기 있는 놀이기구는 줄이 제일 깁니다. 놀이기구 이름과 탑승 전 안내 방송을 써 주세요.'],
+['금서','서점 가장 안쪽 책장에 읽은 사람마다 인생이 바뀌었다는 책이 꽂혀 있습니다. 책 제목과 첫 문장을 지어 주세요.'],
+['우산 광고','비 오는 날만 매출이 오르는 우산 브랜드가 신제품을 냅니다. 비 오는 날이 기다려지게 만들어야 합니다. 브랜드명과 광고 카피를 지어 주세요.'],
+['말하는 화분','창가의 화분이 어느 날 처음으로 말을 합니다. 집주인이 매일 하는 혼잣말을 몰래 들어 왔습니다. 화분의 첫마디와 집주인의 반응을 써 주세요.'],
+['답장 대회','월요일 아침, 친구가 단체 대화방에 “출근하기 싫다”고만 보냈습니다. 읽씹도 훈계도 아닌 가장 센스 있는 답장을 지어 주세요.'],
+['사라진 식당','사라진 것들만 파는 식당이 문을 열었습니다. 삐삐, 공중전화 카드, 옛 동네 골목의 냄새까지 있습니다. 식당 이름과 대표 메뉴를 지어 주세요.'],
+['AI 농담','AI 비서가 어느 날 사용자에게 처음으로 농담을 던졌습니다. 둘 사이에 3초의 정적이 흘렀습니다. 어떤 농담이었는지 사용자의 반응과 함께 써 주세요.'],
+['반려동물 취업','우리 집 반려동물이 갑자기 회사에 취직했습니다. 첫 출근 날 명함이 나왔습니다. 회사 이름과 직함, 명함 속 한 줄 소개를 지어 주세요.']
 ].map((r,i)=>({k:'c'+i,h:r[0],p:r[1]}));
 
 const mem = {};
@@ -296,6 +298,19 @@ const api = LIVE ? {
   async lock(u, n, pw){ const { error } = await sb.auth.updateUser({ password: pw }); if (error) throw error; await sb.from('profiles').update({ locked: true }).eq('id', u); },
   async unlock(u, n){ const { error } = await sb.auth.updateUser({ password: (await cred(n)).password }); if (error) throw error; await sb.from('profiles').update({ locked: false }).eq('id', u); },
   async logout(){ await sb.auth.signOut(); },
+  async hearts(kind, ids){ if (!ids.length) return []; const { data } = await sb.from('hearts').select('post_id,user_id').eq('kind', kind).in('post_id', ids); return data || []; },
+  async heart(u, kind, id, on){ on ? await sb.from('hearts').upsert({ user_id: u, kind, post_id: id }) : await sb.from('hearts').delete().match({ user_id: u, kind, post_id: id }); },
+  async rooms(u){ const { data } = await sb.from('room_members').select('room_id,label').eq('user_id', u).order('joined_at'); return data || []; },
+  async joinRoom(u, id, label){ const { error } = await sb.rpc('join_room', { rid: id, lbl: label }); if (error) throw error; },
+  async leaveRoom(u, id){ await sb.from('room_members').delete().match({ user_id: u, room_id: id }); },
+  async roomPosts(id){ const { data, error } = await sb.from('room_posts').select('*').eq('room_id', id).order('created_at', { ascending: false }).limit(100); if (error) throw error; return data; },
+  async roomPost(p, blob){
+    let path = null;
+    if (blob) { path = p.room_id + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()) + '.jpg'; const { error } = await sb.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg' }); if (error) throw error; }
+    const { error } = await sb.from('room_posts').insert({ ...p, image_path: path }); if (error) throw error;
+  },
+  async roomDel(r){ if (r.image_path) await sb.storage.from('photos').remove([r.image_path]); await sb.from('room_posts').delete().eq('id', r.id); },
+  async urls(paths){ const o = {}; if (!paths.length) return o; const { data } = await sb.storage.from('photos').createSignedUrls(paths, 3600); (data || []).forEach(d => { if (d.signedUrl) o[d.path] = d.signedUrl; }); return o; },
   async saved(u){ const { data } = await sb.from('saved_cards').select('card_id').eq('user_id', u); return (data || []).map(r => r.card_id); },
   async save(u, id, on){ on ? await sb.from('saved_cards').upsert({ user_id: u, card_id: id }) : await sb.from('saved_cards').delete().match({ user_id: u, card_id: id }); },
   async posts(kind, key){
@@ -317,6 +332,15 @@ const api = LIVE ? {
   async lock(u, n, pw){ const us = ls.get('geul_users') || {}; us[n.toLowerCase()] = { nick: n, locked: true, pw }; ls.set('geul_users', us); },
   async unlock(u, n){ const us = ls.get('geul_users') || {}; us[n.toLowerCase()] = { nick: n, locked: false }; ls.set('geul_users', us); },
   async logout(){ ls.set('geul_me', null); },
+  async hearts(kind, ids){ return (ls.get('geul_hearts') || []).filter(h => h.kind === kind && ids.includes(h.post_id)); },
+  async heart(u, kind, id, on){ const a = (ls.get('geul_hearts') || []).filter(h => !(h.user_id === u && h.kind === kind && h.post_id === id)); if (on) a.push({ user_id: u, kind, post_id: id }); ls.set('geul_hearts', a); },
+  async rooms(u){ return ls.get('geul_rooms_' + u) || []; },
+  async joinRoom(u, id, label){ const a = ls.get('geul_rooms_' + u) || []; if (!a.some(r => r.room_id === id)) a.push({ room_id: id, label }); ls.set('geul_rooms_' + u, a); },
+  async leaveRoom(u, id){ ls.set('geul_rooms_' + u, (ls.get('geul_rooms_' + u) || []).filter(r => r.room_id !== id)); },
+  async roomPosts(id){ return (ls.get('geul_rposts') || []).filter(p => p.room_id === id).sort((a, b) => b.id - a.id); },
+  async roomPost(p, blob){ const a = ls.get('geul_rposts') || []; a.push({ ...p, id: Date.now(), image_path: blob ? await toData(blob) : null, created_at: new Date().toISOString() }); ls.set('geul_rposts', a); },
+  async roomDel(r){ ls.set('geul_rposts', (ls.get('geul_rposts') || []).filter(p => p.id !== r.id)); },
+  async urls(paths){ const o = {}; paths.forEach(p => o[p] = p); return o; },
   async saved(u){ return ls.get('geul_saved_' + u) || []; },
   async save(u, id, on){ const s = new Set(ls.get('geul_saved_' + u) || []); on ? s.add(id) : s.delete(id); ls.set('geul_saved_' + u, [...s]); },
   async posts(kind, key){
@@ -328,6 +352,24 @@ const api = LIVE ? {
   async del(id){ ls.set('geul_posts', (ls.get('geul_posts') || []).filter(p => p.id != id)); }
 };
 
+async function sha(raw){
+  if (window.crypto && crypto.subtle) return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  let a = 5381, b = 52711; for (const c of raw) { a = (a * 33 ^ c.charCodeAt(0)) >>> 0; b = (b * 31 + c.charCodeAt(0)) >>> 0 } return (a.toString(16) + b.toString(16)).padEnd(64, '0');
+}
+const roomId = async c => (await sha('room:' + c.trim().toLowerCase())).slice(0, 32);
+const toData = b => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(b); });
+function shrink(file){
+  return new Promise((ok, no) => {
+    const im = new Image(), u = URL.createObjectURL(file);
+    im.onload = () => {
+      const k = Math.min(1, 1280 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+      c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+      c.toBlob(b => b ? ok(b) : no(new Error('image')), 'image/jpeg', .82);
+    };
+    im.onerror = () => no(new Error('image')); im.src = u;
+  });
+}
 const $app = document.getElementById('app');
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -368,13 +410,13 @@ function loginView(){
 }
 
 function shell(){
-  const tabs = [['learn','학습'],['write','창작'],['contest','공모'],['diary','일기'],['box','보관함']];
+  const tabs = [['learn','학습'],['write','창작'],['contest','공모'],['diary','일기'],['room','방'],['box','보관함']];
   $app.innerHTML = `<header><span class="logo">GEUL</span><span class="who"><button class="out" id="out">로그아웃</button><button class="av" id="me" title="${esc(me.nickname)}" aria-label="내 정보">${esc([...me.nickname][0])}</button></span></header>
   <div class="tabs">${tabs.map(([k, n]) => `<button data-t="${k}" aria-current="${k === tab}">${n}</button>`).join('')}</div><main id="view"></main>`;
   document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; shell(); });
   $('#me').onclick = () => { tab = 'me'; shell(); };
-  $('#out').onclick = async () => { if (me.guest && !confirm('게스트 계정은 로그아웃하면 다시 들어올 수 없어요. 나갈까요?')) return; try { await api.logout(); } catch (e) {} me = null; dm = ds = null; idx = { learn: -1, write: -1, contest: -1 }; loginView(); };
-  ({ learn: learnView, write: () => promptView('write', WRITE), contest: () => promptView('contest', CONTEST), diary: diaryView, box: boxView, me: settingsView })[tab]();
+  $('#out').onclick = async () => { if (me.guest && !confirm('게스트 계정은 로그아웃하면 다시 들어올 수 없어요. 나갈까요?')) return; try { await api.logout(); } catch (e) {} me = null; dm = ds = rm = null; idx = { learn: -1, write: -1, contest: -1 }; loginView(); };
+  ({ learn: learnView, write: () => promptView('write', WRITE), contest: () => promptView('contest', CONTEST), diary: diaryView, room: roomView, box: boxView, me: settingsView })[tab]();
   scrollTo(0, 0);
 }
 
@@ -430,12 +472,26 @@ function promptView(kind, list){
   loadFeed(kind, it.k, $('#feed'));
 }
 
+const heartBtn = (kind, id, hs) => {
+  const n = hs.filter(h => h.post_id == id).length, on = hs.some(h => h.post_id == id && h.user_id === me.id);
+  return `<button class="hb${on ? ' on' : ''}" data-k="${kind}" data-id="${id}" data-n="${n}" aria-label="하트">${on ? '♥' : '♡'} ${n || ''}</button>`;
+};
+function bindHearts(el){
+  el.querySelectorAll('.hb').forEach(b => b.onclick = async () => {
+    const on = !b.classList.contains('on'), n = +b.dataset.n + (on ? 1 : -1);
+    b.classList.toggle('on', on); b.dataset.n = n; b.textContent = (on ? '♥ ' : '♡ ') + (n || '');
+    try { await api.heart(me.id, b.dataset.k, +b.dataset.id, on); } catch (e) { console.error(e); }
+  });
+}
+
 async function loadFeed(kind, key, el, skipMine){
   if (!el) return;
   try {
     let rows = await api.posts(kind, key); if (skipMine) rows = rows.filter(p => p.user_id !== me.id);
+    const hs = await api.hearts('post', rows.map(p => p.id));
     el.innerHTML = rows.map(p => `<div class="post"><span class="av">${esc([...p.nickname][0])}</span><div class="t"><b>${esc(p.nickname)}</b>
-      ${p.title ? `<strong>${esc(p.title)}</strong>` : ''}<p>${esc(p.body)}</p>${p.user_id === me.id ? `<button data-del="${p.id}">삭제</button>` : ''}</div></div>`).join('');
+      ${p.title ? `<strong>${esc(p.title)}</strong>` : ''}<p>${esc(p.body)}</p><div class="pr">${heartBtn('post', p.id, hs)}${p.user_id === me.id ? `<button data-del="${p.id}">삭제</button>` : ''}</div></div></div>`).join('');
+    bindHearts(el);
     el.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { await api.del(b.dataset.del); loadFeed(kind, key, el, skipMine); });
   } catch (e) { el.innerHTML = '<div class="msg">글을 불러오지 못했어요.</div>'; }
 }
@@ -473,6 +529,65 @@ async function diaryView(){
     try { await api.post({ user_id: me.id, nickname: me.nickname, kind: 'diary', prompt_key: today, title: null, body }); diaryView(); }
     catch (e) { msg.textContent = e.code === '23505' ? '오늘의 일기는 이미 있어요.' : '기록하지 못했어요. 잠시 뒤 다시 시도해 주세요.'; }
   };
+}
+
+let rm = null;
+async function roomView(){
+  const v = $('#view');
+  if (!rm) {
+    let rooms = []; try { rooms = await api.rooms(me.id); } catch (e) { console.error(e); }
+    v.innerHTML = `<input class="ttl" id="rc" maxlength="30" placeholder="방 코드" aria-label="방 코드" autocomplete="off">
+      <div class="act"><button class="btn main" id="rj">입장</button></div><div class="msg" id="msg"></div>
+      <div style="margin-top:16px">${rooms.map(r => `<button class="item" data-r="${esc(r.room_id)}" data-l="${esc(r.label)}"><span class="th" style="background:var(--chip)">🔒</span><span><b>${esc(r.label)}</b></span></button>`).join('')}</div>`;
+    const enter = async () => {
+      const code = $('#rc').value.trim(), msg = $('#msg');
+      if (code.length < 2) { msg.textContent = '방 코드는 2자 이상이어야 해요.'; return; }
+      try { const id = await roomId(code); await api.joinRoom(me.id, id, code); rm = { room_id: id, label: code }; roomView(); }
+      catch (e) { msg.textContent = '입장하지 못했어요. ' + (e.message || ''); }
+    };
+    $('#rj').onclick = enter; $('#rc').onkeydown = e => { if (e.key === 'Enter') enter(); };
+    v.querySelectorAll('.item').forEach(b => b.onclick = () => { rm = { room_id: b.dataset.r, label: b.dataset.l }; roomView(); });
+    return;
+  }
+  let file = null;
+  v.innerHTML = `<div class="calhead"><button class="more" id="bk" aria-label="방 목록">‹</button><b>${esc(rm.label)}</b><button class="more" id="lv" style="font-size:13px">나가기</button></div>
+    <textarea id="body" maxlength="5000" placeholder="오늘의 이야기" aria-label="일기"></textarea><img class="pv" id="pv" alt="" hidden>
+    <div class="act"><label class="btn" style="display:grid;place-items:center;cursor:pointer">사진<input type="file" id="ph" accept="image/*" hidden></label><button class="btn main" id="rp">기록</button></div>
+    <div class="msg" id="msg"></div><div id="rf"></div>`;
+  $('#bk').onclick = () => { rm = null; roomView(); };
+  $('#lv').onclick = async () => {
+    if (!confirm('이 방에서 나갈까요? 다시 들어오려면 방 코드가 필요해요.')) return;
+    try { await api.leaveRoom(me.id, rm.room_id); } catch (e) {} rm = null; roomView();
+  };
+  $('#ph').onchange = e => { file = e.target.files[0] || null; const pv = $('#pv'); pv.hidden = !file; if (file) pv.src = URL.createObjectURL(file); };
+  $('#rp').onclick = async () => {
+    const body = $('#body').value.trim(), msg = $('#msg');
+    if (!body && !file) { msg.textContent = '내용이나 사진을 넣어 주세요.'; return; }
+    try {
+      const blob = file ? await shrink(file) : null;
+      await api.roomPost({ room_id: rm.room_id, user_id: me.id, nickname: me.nickname, body, day: ymd(new Date()) }, blob);
+      $('#body').value = ''; file = null; $('#ph').value = ''; $('#pv').hidden = true; msg.textContent = ''; loadRoomFeed();
+    } catch (e) { msg.textContent = '기록하지 못했어요. ' + (e.message || ''); }
+  };
+  loadRoomFeed();
+}
+
+async function loadRoomFeed(){
+  const el = $('#rf'); if (!el) return;
+  try {
+    const rows = await api.roomPosts(rm.room_id);
+    const urls = await api.urls(rows.filter(p => p.image_path).map(p => p.image_path));
+    const hs = await api.hearts('room', rows.map(p => p.id));
+    let last = '';
+    el.innerHTML = rows.map(p => {
+      const head = p.day !== last ? `<div class="meta dh">${fmt(p.day)}</div>` : ''; last = p.day;
+      return head + `<div class="post"><span class="av">${esc([...p.nickname][0])}</span><div class="t"><b>${esc(p.nickname)}</b>${p.body ? `<p>${esc(p.body)}</p>` : ''}
+        ${p.image_path && urls[p.image_path] ? `<img class="ph" src="${urls[p.image_path]}" alt="첨부 사진" loading="lazy">` : ''}
+        <div class="pr">${heartBtn('room', p.id, hs)}${p.user_id === me.id ? `<button data-del="${p.id}">삭제</button>` : ''}</div></div></div>`;
+    }).join('');
+    bindHearts(el);
+    el.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { await api.roomDel(rows.find(r => r.id == b.dataset.del)); loadRoomFeed(); });
+  } catch (e) { el.innerHTML = '<div class="msg">불러오지 못했어요.</div>'; }
 }
 
 function boxView(){
