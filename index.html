@@ -76,8 +76,8 @@ textarea:focus,.ttl:focus{border-color:var(--fg)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 // Supabase 대시보드 > Project Settings > API 의 값을 붙여넣으세요. 비워 두면 이 기기에만 저장되는 체험 모드로 동작합니다.
-const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY';
+const SUPABASE_URL = 'https://uwfcxcuohsiwoxkwdtoh.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_wbfynaPxo8Z6zTI5iRjD5w_lEG3R6sB';
 const LIVE = !SUPABASE_URL.includes('YOUR-PROJECT') && typeof supabase !== 'undefined';
 const sb = LIVE ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
@@ -323,17 +323,20 @@ async function boot(){
 }
 
 function loginView(){
-  $app.innerHTML = `<main class="login"><h1>GEUL</h1><input id="nick" maxlength="12" placeholder="닉네임" aria-label="닉네임" autocomplete="off">
-  <button class="btn main" id="in" style="width:100%">로그인</button><button class="btn sub" id="up" style="width:100%">가입</button><div class="msg" id="msg"></div></main>`;
-  const go = kind => async () => {
+  $app.innerHTML = `<main class="login"><h1>GEUL</h1><input id="nick" maxlength="12" placeholder="닉네임" aria-label="닉네임" autocomplete="off" value="${esc(ls.get('geul_last') || '')}">
+  <button class="btn main" id="go" style="width:100%">시작</button><div class="msg" id="msg"></div></main>`;
+  const go = async () => {
     const nick = $('#nick').value.trim(), msg = $('#msg');
     if (nick.length < 2 || nick.length > 12) { msg.textContent = '닉네임은 2~12자로 입력해 주세요.'; return; }
     msg.textContent = '';
-    try { me = await api[kind](nick); savedIds = new Set(await api.saved(me.id)); tab = 'learn'; shell(); }
-    catch (e) { msg.textContent = em(e); }
+    try {
+      try { me = await api.login(nick); }
+      catch (e) { if (e.code === 'nouser' || /invalid login/i.test(e.message || '')) me = await api.join(nick); else throw e; }
+      ls.set('geul_last', nick); savedIds = new Set(await api.saved(me.id)); tab = 'learn'; shell();
+    } catch (e) { msg.textContent = em(e); }
   };
-  $('#in').onclick = go('login'); $('#up').onclick = go('join');
-  $('#nick').onkeydown = e => { if (e.key === 'Enter') go('login')(); };
+  $('#go').onclick = go;
+  $('#nick').onkeydown = e => { if (e.key === 'Enter') go(); };
 }
 
 function shell(){
