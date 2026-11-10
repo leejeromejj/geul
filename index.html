@@ -69,6 +69,7 @@ textarea:focus,.ttl:focus{border-color:var(--fg)}
 .cal .d.sel{background:var(--fg);color:var(--bg)}
 .cal .d.has::after{content:'';position:absolute;bottom:5px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:currentColor}
 .cal .d:disabled{opacity:.28;cursor:default}
+button.av{border:0;color:inherit;cursor:pointer}
 </style>
 </head>
 <body>
@@ -265,20 +266,35 @@ async function cred(n){
 const api = LIVE ? {
   async me(){
     const { data: { session } } = await sb.auth.getSession(); if (!session) return null;
-    const { data } = await sb.from('profiles').select('nickname').eq('id', session.user.id).maybeSingle();
-    return data ? { id: session.user.id, nickname: data.nickname } : null;
+    const { data } = await sb.from('profiles').select('nickname,locked').eq('id', session.user.id).maybeSingle();
+    return data ? { id: session.user.id, nickname: data.nickname, locked: data.locked, guest: !!session.user.is_anonymous } : null;
   },
-  async login(n){
-    const { data, error } = await sb.auth.signInWithPassword(await cred(n)); if (error) throw error;
-    const { data: p } = await sb.from('profiles').select('nickname').eq('id', data.user.id).maybeSingle();
-    return { id: data.user.id, nickname: p ? p.nickname : n };
+  async enter(n, pw){
+    const { data: p } = await sb.from('profiles').select('nickname,locked').ilike('nickname', n.replace(/[%_\\]/g, '\\$&')).maybeSingle();
+    const c = await cred(n);
+    if (!p) {
+      const { data, error } = await sb.auth.signUp(c); if (error) throw error;
+      if (!data.session) throw { message: 'confirm email' };
+      const { error: e2 } = await sb.from('profiles').insert({ id: data.user.id, nickname: n }); if (e2) throw e2;
+      return { id: data.user.id, nickname: n, locked: false, guest: false };
+    }
+    if (p.locked && !pw) throw { code: 'needpw' };
+    const { data, error } = await sb.auth.signInWithPassword({ email: c.email, password: p.locked ? pw : c.password });
+    if (error) throw p.locked ? { code: 'badpw' } : error;
+    return { id: data.user.id, nickname: p.nickname, locked: !!p.locked, guest: false };
   },
-  async join(n){
-    const { data, error } = await sb.auth.signUp(await cred(n)); if (error) throw error;
-    if (!data.session) throw (data.user && data.user.identities && !data.user.identities.length ? { code: '23505' } : { message: 'confirm email' });
-    const { error: e2 } = await sb.from('profiles').insert({ id: data.user.id, nickname: n }); if (e2) throw e2;
-    return { id: data.user.id, nickname: n };
+  async guest(){
+    const { data, error } = await sb.auth.signInAnonymously(); if (error) throw error;
+    for (let i = 0; i < 4; i++) {
+      const nick = '익명' + (Math.floor(Math.random() * 9000) + 1000);
+      const { error: e2 } = await sb.from('profiles').insert({ id: data.user.id, nickname: nick });
+      if (!e2) return { id: data.user.id, nickname: nick, locked: false, guest: true };
+      if (e2.code !== '23505') throw e2;
+    }
+    throw { message: 'retry' };
   },
+  async lock(u, n, pw){ const { error } = await sb.auth.updateUser({ password: pw }); if (error) throw error; await sb.from('profiles').update({ locked: true }).eq('id', u); },
+  async unlock(u, n){ const { error } = await sb.auth.updateUser({ password: (await cred(n)).password }); if (error) throw error; await sb.from('profiles').update({ locked: false }).eq('id', u); },
   async logout(){ await sb.auth.signOut(); },
   async saved(u){ const { data } = await sb.from('saved_cards').select('card_id').eq('user_id', u); return (data || []).map(r => r.card_id); },
   async save(u, id, on){ on ? await sb.from('saved_cards').upsert({ user_id: u, card_id: id }) : await sb.from('saved_cards').delete().match({ user_id: u, card_id: id }); },
@@ -291,8 +307,15 @@ const api = LIVE ? {
   async del(id){ await sb.from('posts').delete().eq('id', id); }
 } : {
   async me(){ return ls.get('geul_me'); },
-  async login(n){ if (!(ls.get('geul_users') || {})[n.toLowerCase()]) throw { code: 'nouser' }; const m = { id: 'l:' + n, nickname: n }; ls.set('geul_me', m); return m; },
-  async join(n){ const u = ls.get('geul_users') || {}; if (u[n.toLowerCase()]) throw { code: '23505' }; u[n.toLowerCase()] = 1; ls.set('geul_users', u); const m = { id: 'l:' + n, nickname: n }; ls.set('geul_me', m); return m; },
+  async enter(n, pw){
+    const us = ls.get('geul_users') || {}, k = n.toLowerCase(), p = us[k];
+    if (p && p.locked) { if (!pw) throw { code: 'needpw' }; if (pw !== p.pw) throw { code: 'badpw' }; }
+    if (!p) { us[k] = { nick: n, locked: false }; ls.set('geul_users', us); }
+    const m = { id: 'l:' + k, nickname: p ? p.nick : n, locked: !!(p && p.locked), guest: false }; ls.set('geul_me', m); return m;
+  },
+  async guest(){ const m = { id: 'g:' + Date.now(), nickname: '익명' + (Math.floor(Math.random() * 9000) + 1000), locked: false, guest: true }; ls.set('geul_me', m); return m; },
+  async lock(u, n, pw){ const us = ls.get('geul_users') || {}; us[n.toLowerCase()] = { nick: n, locked: true, pw }; ls.set('geul_users', us); },
+  async unlock(u, n){ const us = ls.get('geul_users') || {}; us[n.toLowerCase()] = { nick: n, locked: false }; ls.set('geul_users', us); },
   async logout(){ ls.set('geul_me', null); },
   async saved(u){ return ls.get('geul_saved_' + u) || []; },
   async save(u, id, on){ const s = new Set(ls.get('geul_saved_' + u) || []); on ? s.add(id) : s.delete(id); ls.set('geul_saved_' + u, [...s]); },
@@ -311,10 +334,12 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const pick = (n, cur) => { let i; do { i = Math.floor(Math.random() * n) } while (n > 1 && i === cur); return i; };
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const fmt = s => new Date(s + 'T00:00:00').toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-const em = e => { const m = e.message || ''; return e.code === '23505' || /already/i.test(m) ? '이미 사용 중인 닉네임이에요.'
-  : e.code === 'nouser' || /invalid login/i.test(m) ? '가입된 닉네임이 없어요. 가입을 눌러 주세요.'
+const em = e => { const m = e.message || ''; return e.code === 'badpw' ? '비밀번호가 맞지 않아요.'
+  : e.code === '23505' || /already|invalid login/i.test(m) ? '이미 사용 중인 닉네임이에요.'
   : /fetch|network/i.test(m) ? '서버에 연결하지 못했어요. SUPABASE_URL과 키를 확인해 주세요.'
-  : /confirm/i.test(m) ? 'Supabase에서 Confirm email을 꺼 주세요.' : '오류가 났어요. ' + m; };
+  : /anonymous/i.test(m) ? 'Supabase에서 Anonymous sign-ins를 켜 주세요.'
+  : /confirm|rate limit/i.test(m) ? 'Supabase에서 Confirm email을 꺼 주세요. 이미 껐다면 Authentication > Users에서 테스트 계정을 지우고 다시 시도해 주세요.'
+  : '오류가 났어요. ' + m; };
 let me = null, tab = 'learn', idx = { learn: -1, write: -1, contest: -1 }, savedIds = new Set();
 
 async function boot(){
@@ -324,29 +349,52 @@ async function boot(){
 
 function loginView(){
   $app.innerHTML = `<main class="login"><h1>GEUL</h1><input id="nick" maxlength="12" placeholder="닉네임" aria-label="닉네임" autocomplete="off" value="${esc(ls.get('geul_last') || '')}">
-  <button class="btn main" id="go" style="width:100%">시작</button><div class="msg" id="msg"></div></main>`;
+  <input id="pw" type="password" placeholder="비밀번호" aria-label="비밀번호" autocomplete="current-password" style="margin-top:8px" hidden>
+  <button class="btn main" id="go" style="width:100%">시작</button><button class="btn sub" id="gs" style="width:100%">게스트로 시작</button><div class="msg" id="msg"></div></main>`;
+  const done = async m => { me = m; savedIds = new Set(await api.saved(me.id)); tab = 'learn'; shell(); };
   const go = async () => {
     const nick = $('#nick').value.trim(), msg = $('#msg');
     if (nick.length < 2 || nick.length > 12) { msg.textContent = '닉네임은 2~12자로 입력해 주세요.'; return; }
     msg.textContent = '';
-    try {
-      try { me = await api.login(nick); }
-      catch (e) { if (e.code === 'nouser' || /invalid login/i.test(e.message || '')) me = await api.join(nick); else throw e; }
-      ls.set('geul_last', nick); savedIds = new Set(await api.saved(me.id)); tab = 'learn'; shell();
-    } catch (e) { msg.textContent = em(e); }
+    try { const m = await api.enter(nick, $('#pw').value); ls.set('geul_last', nick); await done(m); }
+    catch (e) {
+      if (e.code === 'needpw') { $('#pw').hidden = false; $('#pw').focus(); msg.textContent = '보호된 닉네임이에요. 비밀번호를 입력해 주세요.'; }
+      else msg.textContent = em(e);
+    }
   };
   $('#go').onclick = go;
-  $('#nick').onkeydown = e => { if (e.key === 'Enter') go(); };
+  $('#gs').onclick = async () => { try { await done(await api.guest()); } catch (e) { $('#msg').textContent = em(e); } };
+  $('#nick').onkeydown = $('#pw').onkeydown = e => { if (e.key === 'Enter') go(); };
 }
 
 function shell(){
   const tabs = [['learn','학습'],['write','창작'],['contest','공모'],['diary','일기'],['box','보관함']];
-  $app.innerHTML = `<header><span class="logo">GEUL</span><span class="who"><button class="out" id="out">로그아웃</button><span class="av" title="${esc(me.nickname)}">${esc([...me.nickname][0])}</span></span></header>
+  $app.innerHTML = `<header><span class="logo">GEUL</span><span class="who"><button class="out" id="out">로그아웃</button><button class="av" id="me" title="${esc(me.nickname)}" aria-label="내 정보">${esc([...me.nickname][0])}</button></span></header>
   <div class="tabs">${tabs.map(([k, n]) => `<button data-t="${k}" aria-current="${k === tab}">${n}</button>`).join('')}</div><main id="view"></main>`;
   document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; shell(); });
-  $('#out').onclick = async () => { try { await api.logout(); } catch (e) {} me = null; dm = ds = null; idx = { learn: -1, write: -1, contest: -1 }; loginView(); };
-  ({ learn: learnView, write: () => promptView('write', WRITE), contest: () => promptView('contest', CONTEST), diary: diaryView, box: boxView })[tab]();
+  $('#me').onclick = () => { tab = 'me'; shell(); };
+  $('#out').onclick = async () => { if (me.guest && !confirm('게스트 계정은 로그아웃하면 다시 들어올 수 없어요. 나갈까요?')) return; try { await api.logout(); } catch (e) {} me = null; dm = ds = null; idx = { learn: -1, write: -1, contest: -1 }; loginView(); };
+  ({ learn: learnView, write: () => promptView('write', WRITE), contest: () => promptView('contest', CONTEST), diary: diaryView, box: boxView, me: settingsView })[tab]();
   scrollTo(0, 0);
+}
+
+function settingsView(){
+  $('#view').innerHTML = `<div class="meta">내 닉네임</div><h2>${esc(me.nickname)}</h2>` + (me.guest
+    ? '<p class="read" style="margin-top:12px">게스트 계정이에요. 로그아웃하면 다시 들어올 수 없어요.</p>'
+    : me.locked
+      ? '<p class="read" style="margin-top:12px">이 닉네임은 비밀번호로 보호되고 있어요.</p><div class="act"><button class="btn" id="ul">보호 해제</button></div>'
+      : `<p class="read" style="margin:12px 0">지금은 누구나 이 닉네임으로 들어올 수 있어요. 비밀번호를 정하면 나만 쓸 수 있어요.</p>
+         <input class="ttl" id="npw" type="password" placeholder="비밀번호 (6자 이상)" aria-label="비밀번호" autocomplete="new-password">
+         <div class="act"><button class="btn main" id="lk">닉네임 보호하기</button></div>`) + '<div class="msg" id="msg"></div>';
+  const msg = $('#msg');
+  if ($('#lk')) $('#lk').onclick = async () => {
+    const pw = $('#npw').value;
+    if (pw.length < 6) { msg.textContent = '비밀번호는 6자 이상이어야 해요.'; return; }
+    try { await api.lock(me.id, me.nickname, pw); me.locked = true; settingsView(); } catch (e) { msg.textContent = '설정하지 못했어요. ' + (e.message || ''); }
+  };
+  if ($('#ul')) $('#ul').onclick = async () => {
+    try { await api.unlock(me.id, me.nickname); me.locked = false; settingsView(); } catch (e) { msg.textContent = '해제하지 못했어요. ' + (e.message || ''); }
+  };
 }
 
 function learnView(){
