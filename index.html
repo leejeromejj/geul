@@ -78,6 +78,24 @@ button.av{border:0;color:inherit;cursor:pointer}
 .post .pr .hb{font-size:15px}
 .post .pr .hb.on{color:#E5484D}
 .dh{margin:22px 0 4px}
+main{padding-bottom:104px}
+.bar{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line);z-index:6}
+.bar .btn{white-space:nowrap;font-size:15px;padding:0 12px}
+.bar .btn:first-child{flex:1}
+.bar #nx{flex:0 0 42%}
+.top{display:flex;gap:8px;align-items:center}
+.top .more{margin:0 0 0 auto;font-size:14px;color:var(--fg)}
+.seg{display:flex;gap:6px;margin-bottom:18px}
+.seg button{border:1px solid var(--line);background:none;border-radius:999px;padding:4px 16px;font-size:14px}
+.seg button[aria-current=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.bd{background:#E5484D;color:#fff;border-radius:999px;font-size:10px;padding:0 5px;margin-left:3px;vertical-align:top}
+#toast{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);max-width:440px;width:calc(100% - 32px);background:var(--fg);color:var(--bg);border:0;border-radius:14px;padding:12px 16px;font:inherit;font-size:14px;z-index:20;text-align:left}
+#toast[hidden]{display:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
+.chip .x{border:0;background:none;padding:0 0 0 4px;font-size:14px}
+.tp{display:block;font-size:12px;color:var(--mute);margin-top:2px}
+.lock p{color:var(--mute)}
+.go{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -229,7 +247,7 @@ XW.forEach((r,i)=>WRITE.push({k:'x'+i,len:r[0],p:r[1]}));
 const CONTEST=[
 ['학교 이름','외계 함선이 서울 상공에 나타난 지 1년. 정부가 비밀리에 영웅 양성 학교를 세우고 신입생 모집 포스터를 붙이려 합니다. 학교 이름과 포스터 문구를 지어 주세요.'],
 ['편의점','달에 24시간 편의점 1호점이 문을 엽니다. 손님은 우주비행사와 외계인 알바생뿐이고 도시락은 튜브형입니다. 가게 이름과 대표 상품 이름을 지어 주세요.'],
-['작품 제목','2036년, 넷플릭스 전 세계 1위를 8주째 지키는 한국 드라마가 있습니다. 주인공은 은퇴한 택배기사입니다. 제목과 한 줄 소개를 지어 주세요.'],
+['작품 제목','2036년, 넷플릭스 전 세계 1위를 8주째 지키는 작품이 있습니다. 제목과 한 줄 소개를 지어 주세요.'],
 ['조선 카페','한양 종로에 최초의 카페가 문을 열었습니다. 양반과 보부상이 한 줄로 서 있습니다. 가게 이름과 시그니처 메뉴, 메뉴 설명을 지어 주세요.'],
 ['신제품','월요일 아침에 마시면 출근길이 소풍처럼 느껴진다는 음료가 편의점에 입고됐습니다. 제품명과 병에 적힌 한 줄 문구를 지어 주세요.'],
 ['신조어','지하철에서 내릴 역을 지나친 순간의 아찔함처럼, 모두가 겪지만 이름이 없는 감정이 있습니다. 하나를 골라 신조어와 뜻풀이, 예문을 지어 주세요.'],
@@ -298,6 +316,19 @@ const api = LIVE ? {
   async lock(u, n, pw){ const { error } = await sb.auth.updateUser({ password: pw }); if (error) throw error; await sb.from('profiles').update({ locked: true }).eq('id', u); },
   async unlock(u, n){ const { error } = await sb.auth.updateUser({ password: (await cred(n)).password }); if (error) throw error; await sb.from('profiles').update({ locked: false }).eq('id', u); },
   async logout(){ await sb.auth.signOut(); },
+  async findUser(n){ const { data } = await sb.from('profiles').select('id,nickname').ilike('nickname', n.replace(/[%_\\]/g, '\\$&')).maybeSingle(); return data; },
+  async follow(u, f){ const { error } = await sb.from('follows').insert({ follower: u, followee: f }); if (error && error.code !== '23505') throw error; },
+  async unfollow(u, f){ await sb.from('follows').delete().match({ follower: u, followee: f }); },
+  async following(u){
+    const { data } = await sb.from('follows').select('followee').eq('follower', u); const ids = (data || []).map(r => r.followee); if (!ids.length) return [];
+    const { data: p } = await sb.from('profiles').select('id,nickname').in('id', ids); return p || [];
+  },
+  async friendFeed(){ const { data, error } = await sb.rpc('friend_feed'); if (error) throw error; return data || []; },
+  async notifs(u){ const { data } = await sb.from('notifs').select('*').eq('user_id', u).eq('read', false).order('created_at', { ascending: false }).limit(30); return data || []; },
+  async readAll(u){ await sb.from('notifs').update({ read: true }).eq('user_id', u).eq('read', false); },
+  async count(kind, key){ const { data } = await sb.rpc('count_posts', { k: kind, pk: key }); return data || 0; },
+  async savedPrompts(u){ const { data } = await sb.from('saved_prompts').select('kind,prompt_key').eq('user_id', u); return data || []; },
+  async savePrompt(u, kind, key, on){ on ? await sb.from('saved_prompts').upsert({ user_id: u, kind, prompt_key: key }) : await sb.from('saved_prompts').delete().match({ user_id: u, kind, prompt_key: key }); },
   async hearts(kind, ids){ if (!ids.length) return []; const { data } = await sb.from('hearts').select('post_id,user_id').eq('kind', kind).in('post_id', ids); return data || []; },
   async heart(u, kind, id, on){ on ? await sb.from('hearts').upsert({ user_id: u, kind, post_id: id }) : await sb.from('hearts').delete().match({ user_id: u, kind, post_id: id }); },
   async rooms(u){ const { data } = await sb.from('room_members').select('room_id,label').eq('user_id', u).order('joined_at'); return data || []; },
@@ -332,6 +363,22 @@ const api = LIVE ? {
   async lock(u, n, pw){ const us = ls.get('geul_users') || {}; us[n.toLowerCase()] = { nick: n, locked: true, pw }; ls.set('geul_users', us); },
   async unlock(u, n){ const us = ls.get('geul_users') || {}; us[n.toLowerCase()] = { nick: n, locked: false }; ls.set('geul_users', us); },
   async logout(){ ls.set('geul_me', null); },
+  async findUser(n){ const u = (ls.get('geul_users') || {})[n.toLowerCase()]; return u ? { id: 'l:' + n.toLowerCase(), nickname: u.nick } : null; },
+  async follow(u, f){ const us = ls.get('geul_users') || {}, k = f.slice(2), a = ls.get('geul_fol_' + u) || []; if (!a.some(x => x.id === f)) a.push({ id: f, nickname: us[k] ? us[k].nick : k }); ls.set('geul_fol_' + u, a); },
+  async unfollow(u, f){ ls.set('geul_fol_' + u, (ls.get('geul_fol_' + u) || []).filter(x => x.id !== f)); },
+  async following(u){ return ls.get('geul_fol_' + u) || []; },
+  async friendFeed(){
+    const m = ls.get('geul_me'), ids = (ls.get('geul_fol_' + m.id) || []).map(x => x.id), all = ls.get('geul_posts') || [];
+    return all.filter(p => ids.includes(p.user_id)).sort((a, b) => b.id - a.id).map(p => {
+      const ok = all.some(x => x.user_id === m.id && x.kind === p.kind && x.prompt_key === p.prompt_key);
+      return ok ? { ...p, unlocked: true } : { ...p, title: null, body: null, unlocked: false };
+    });
+  },
+  async notifs(){ return []; },
+  async readAll(){},
+  async count(kind, key){ return (ls.get('geul_posts') || []).filter(p => p.kind === kind && p.prompt_key === key).length; },
+  async savedPrompts(u){ return ls.get('geul_sp_' + u) || []; },
+  async savePrompt(u, kind, key, on){ const a = (ls.get('geul_sp_' + u) || []).filter(r => !(r.kind === kind && r.prompt_key === key)); if (on) a.push({ kind, prompt_key: key }); ls.set('geul_sp_' + u, a); },
   async hearts(kind, ids){ return (ls.get('geul_hearts') || []).filter(h => h.kind === kind && ids.includes(h.post_id)); },
   async heart(u, kind, id, on){ const a = (ls.get('geul_hearts') || []).filter(h => !(h.user_id === u && h.kind === kind && h.post_id === id)); if (on) a.push({ user_id: u, kind, post_id: id }); ls.set('geul_hearts', a); },
   async rooms(u){ return ls.get('geul_rooms_' + u) || []; },
@@ -382,10 +429,14 @@ const em = e => { const m = e.message || ''; return e.code === 'badpw' ? '비밀
   : /anonymous/i.test(m) ? 'Supabase에서 Anonymous sign-ins를 켜 주세요.'
   : /confirm|rate limit/i.test(m) ? 'Supabase에서 Confirm email을 꺼 주세요. 이미 껐다면 Authentication > Users에서 테스트 계정을 지우고 다시 시도해 주세요.'
   : '오류가 났어요. ' + m; };
-let me = null, tab = 'learn', idx = { learn: -1, write: -1, contest: -1 }, savedIds = new Set();
+let me = null, tab = 'learn', idx = { learn: -1, write: -1, contest: -1 }, savedIds = new Set(), spSet = new Set();
+async function loadSaved(){
+  savedIds = new Set(await api.saved(me.id));
+  try { spSet = new Set((await api.savedPrompts(me.id)).map(r => r.kind + ':' + r.prompt_key)); } catch (e) { spSet = new Set(); }
+}
 
 async function boot(){
-  try { me = await api.me(); if (me) { savedIds = new Set(await api.saved(me.id)); return shell(); } } catch (e) { console.error(e); }
+  try { me = await api.me(); if (me) { await loadSaved(); return shell(); } } catch (e) { console.error(e); }
   loginView();
 }
 
@@ -393,7 +444,7 @@ function loginView(){
   $app.innerHTML = `<main class="login"><h1>GEUL</h1><input id="nick" maxlength="12" placeholder="닉네임" aria-label="닉네임" autocomplete="off" value="${esc(ls.get('geul_last') || '')}">
   <input id="pw" type="password" placeholder="비밀번호" aria-label="비밀번호" autocomplete="current-password" style="margin-top:8px" hidden>
   <button class="btn main" id="go" style="width:100%">시작</button><button class="btn sub" id="gs" style="width:100%">게스트로 시작</button><div class="msg" id="msg"></div></main>`;
-  const done = async m => { me = m; savedIds = new Set(await api.saved(me.id)); tab = 'learn'; shell(); };
+  const done = async m => { me = m; await loadSaved(); tab = 'learn'; shell(); };
   const go = async () => {
     const nick = $('#nick').value.trim(), msg = $('#msg');
     if (nick.length < 2 || nick.length > 12) { msg.textContent = '닉네임은 2~12자로 입력해 주세요.'; return; }
@@ -410,13 +461,14 @@ function loginView(){
 }
 
 function shell(){
-  const tabs = [['learn','학습'],['write','창작'],['contest','공모'],['diary','일기'],['room','방'],['box','보관함']];
+  const tabs = [['learn','학습'],['write','창작'],['contest','공모'],['diary','일기'],['friend','친구'],['box','보관함']];
   $app.innerHTML = `<header><span class="logo">GEUL</span><span class="who"><button class="out" id="out">로그아웃</button><button class="av" id="me" title="${esc(me.nickname)}" aria-label="내 정보">${esc([...me.nickname][0])}</button></span></header>
   <div class="tabs">${tabs.map(([k, n]) => `<button data-t="${k}" aria-current="${k === tab}">${n}</button>`).join('')}</div><main id="view"></main>`;
   document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; shell(); });
+  paintBadge(); if (!pollT) startPoll();
   $('#me').onclick = () => { tab = 'me'; shell(); };
-  $('#out').onclick = async () => { if (me.guest && !confirm('게스트 계정은 로그아웃하면 다시 들어올 수 없어요. 나갈까요?')) return; try { await api.logout(); } catch (e) {} me = null; dm = ds = rm = null; idx = { learn: -1, write: -1, contest: -1 }; loginView(); };
-  ({ learn: learnView, write: () => promptView('write', WRITE), contest: () => promptView('contest', CONTEST), diary: diaryView, room: roomView, box: boxView, me: settingsView })[tab]();
+  $('#out').onclick = async () => { if (me.guest && !confirm('게스트 계정은 로그아웃하면 다시 들어올 수 없어요. 나갈까요?')) return; stopPoll(); try { await api.logout(); } catch (e) {} me = null; dm = ds = rm = null; idx = { learn: -1, write: -1, contest: -1 }; loginView(); };
+  ({ learn: learnView, write: () => promptView('write', WRITE), contest: () => promptView('contest', CONTEST), diary: diaryTab, friend: friendView, box: boxView, me: settingsView })[tab]();
   scrollTo(0, 0);
 }
 
@@ -444,7 +496,7 @@ function learnView(){
   const c = CARDS[idx.learn], on = savedIds.has(idx.learn);
   $('#view').innerHTML = `<div class="art" style="background:${c.c}" aria-hidden="true">${c.e}</div>
   <div class="meta">${esc(c.cat)}</div><h2>${esc(c.t)}</h2><div class="word">${esc(c.w)}</div><p class="read">${esc(c.d)}</p>
-  <div class="act"><button class="btn ${on ? 'on' : ''}" id="sv">${on ? '저장됨' : '저장'}</button><button class="btn main" id="nx">다음</button></div>`;
+  <div class="act bar"><button class="btn ${on ? 'on' : ''}" id="sv">${on ? '저장됨' : '저장'}</button><button class="btn main" id="nx">다음</button></div>`;
   $('#nx').onclick = () => { idx.learn = pick(CARDS.length, idx.learn); learnView(); scrollTo(0, 0); };
   $('#sv').onclick = async () => {
     const next = !savedIds.has(idx.learn);
@@ -456,18 +508,25 @@ function learnView(){
 function promptView(kind, list){
   if (idx[kind] < 0) idx[kind] = pick(list.length, -1);
   const it = list[idx[kind]], isW = kind === 'write';
-  $('#view').innerHTML = `<span class="chip">${isW ? esc(it.len) : '공모 · ' + esc(it.h)}</span><p class="q">${esc(it.p)}</p>
+  $('#view').innerHTML = `<div class="top"><span class="chip">${isW ? esc(it.len) : '공모 · ' + esc(it.h)}</span><span class="chip" id="cnt">답변 …</span><button class="more" id="bm">${spSet.has(kind + ':' + it.k) ? '★ 보관됨' : '☆ 보관'}</button></div><p class="q">${esc(it.p)}</p>
   ${isW ? '<input class="ttl" id="ttl" maxlength="60" placeholder="제목 (선택)" aria-label="제목">' : ''}
   <textarea id="body" maxlength="5000" placeholder="${isW ? '이어서 써 보세요' : '재치 있는 답을 남겨 보세요'}" aria-label="내 글"></textarea>
-  <div class="act"><button class="btn main" id="post">게시하고 다른 글 보기</button><button class="btn" id="nx">다음 주제</button></div><div class="msg" id="msg"></div><div class="feed" id="feed"></div>`;
+  <div class="act bar"><button class="btn main" id="post">게시하고 다른 글 보기</button><button class="btn" id="nx">다음 주제</button></div><div class="msg" id="msg"></div><div class="feed" id="feed"></div>`;
   $('#nx').onclick = () => { idx[kind] = pick(list.length, idx[kind]); promptView(kind, list); scrollTo(0, 0); };
   $('#post').onclick = async () => {
     const body = $('#body').value.trim(), msg = $('#msg');
     if (!body) { msg.textContent = '내용을 입력해 주세요.'; return; }
     try {
       await api.post({ user_id: me.id, nickname: me.nickname, kind, prompt_key: it.k, title: isW ? ($('#ttl').value.trim() || null) : null, body });
-      $('#body').value = ''; if (isW) $('#ttl').value = ''; msg.textContent = ''; loadFeed(kind, it.k, $('#feed'));
+      $('#body').value = ''; if (isW) $('#ttl').value = ''; msg.textContent = ''; loadFeed(kind, it.k, $('#feed')); refresh();
     } catch (e) { msg.textContent = '게시하지 못했어요. 잠시 뒤 다시 시도해 주세요.'; }
+  };
+  const refresh = () => api.count(kind, it.k).then(n => { const c = $('#cnt'); if (c) c.textContent = '답변 ' + n + '개'; }).catch(() => {});
+  refresh();
+  $('#bm').onclick = async () => {
+    const key = kind + ':' + it.k, on = !spSet.has(key);
+    on ? spSet.add(key) : spSet.delete(key); $('#bm').textContent = on ? '★ 보관됨' : '☆ 보관';
+    try { await api.savePrompt(me.id, kind, it.k, on); } catch (e) { console.error(e); }
   };
   loadFeed(kind, it.k, $('#feed'));
 }
@@ -498,7 +557,7 @@ async function loadFeed(kind, key, el, skipMine){
 
 let dm = null, ds = null;
 async function diaryView(){
-  const today = ymd(new Date()), v = $('#view');
+  const today = ymd(new Date()), v = $('#sub');
   if (!ds) ds = today;
   if (!dm) dm = new Date(+ds.slice(0, 4), +ds.slice(5, 7) - 1, 1);
   let mine = []; try { mine = await api.mine(me.id, 'diary'); } catch (e) { console.error(e); }
@@ -533,7 +592,7 @@ async function diaryView(){
 
 let rm = null;
 async function roomView(){
-  const v = $('#view');
+  const v = $('#sub');
   if (!rm) {
     let rooms = []; try { rooms = await api.rooms(me.id); } catch (e) { console.error(e); }
     v.innerHTML = `<input class="ttl" id="rc" maxlength="30" placeholder="방 코드" aria-label="방 코드" autocomplete="off">
@@ -590,10 +649,97 @@ async function loadRoomFeed(){
   } catch (e) { el.innerHTML = '<div class="msg">불러오지 못했어요.</div>'; }
 }
 
+let dsub = 'pub', unread = 0, seenN = new Set(), pollT = null;
+function diaryTab(){
+  $('#view').innerHTML = `<div class="seg">${[['pub','공개 일기'],['room','비공개 방']].map(([k, n]) => `<button data-s="${k}" aria-current="${k === dsub}">${n}</button>`).join('')}</div><div id="sub"></div>`;
+  document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { dsub = b.dataset.s; diaryTab(); });
+  dsub === 'pub' ? diaryView() : roomView();
+}
+
+function paintBadge(){
+  const b = document.querySelector('.tabs [data-t="friend"]');
+  if (b) b.innerHTML = '친구' + (unread ? `<sup class="bd">${unread > 9 ? '9+' : unread}</sup>` : '');
+}
+function toast(msg){
+  let t = $('#toast');
+  if (!t) { t = document.createElement('button'); t.id = 'toast'; t.hidden = true; t.onclick = () => { t.hidden = true; tab = 'friend'; shell(); }; document.body.appendChild(t); }
+  t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => { t.hidden = true; }, 5000);
+}
+async function poll(first){
+  if (!me) return;
+  try {
+    const rows = await api.notifs(me.id), fresh = rows.filter(r => !seenN.has(r.id));
+    rows.forEach(r => seenN.add(r.id)); unread = rows.length; paintBadge();
+    if (!first && fresh.length) {
+      const r = fresh[0], txt = `${r.actor_name}님이 ${r.kind === 'diary' ? '일기를' : '새 글을'} 썼어요${fresh.length > 1 ? ` 외 ${fresh.length - 1}건` : ''}`;
+      toast(txt);
+      if ('Notification' in window && Notification.permission === 'granted' && document.hidden) { try { new Notification('GEUL', { body: txt }); } catch (e) {} }
+    }
+  } catch (e) { console.error(e); }
+}
+function startPoll(){ stopPoll(); poll(true); pollT = setInterval(() => poll(false), 30000); }
+function stopPoll(){ clearInterval(pollT); pollT = null; seenN = new Set(); unread = 0; }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(false); });
+
+const KL = { write: '창작', contest: '공모', diary: '일기' };
+const topicOf = p => { if (p.kind === 'diary') return fmt(p.prompt_key); const it = (p.kind === 'write' ? WRITE : CONTEST).find(x => x.k === p.prompt_key); return it ? [...it.p].slice(0, 36).join('') + '…' : ''; };
+
+function friendView(){
+  $('#view').innerHTML = `<input class="ttl" id="fn" maxlength="12" placeholder="친구 닉네임" aria-label="친구 닉네임" autocomplete="off">
+    <div class="act"><button class="btn main" id="fa">팔로우</button></div><div class="msg" id="msg"></div>
+    <div id="fl"></div><div class="feed" id="ff"></div>`;
+  const add = async () => {
+    const n = $('#fn').value.trim(), msg = $('#msg');
+    if (n.length < 2) { msg.textContent = '친구 닉네임을 입력해 주세요.'; return; }
+    try {
+      const u = await api.findUser(n);
+      if (!u) { msg.textContent = '그 닉네임은 찾을 수 없어요.'; return; }
+      if (u.id === me.id) { msg.textContent = '나는 팔로우할 수 없어요.'; return; }
+      await api.follow(me.id, u.id); $('#fn').value = ''; msg.textContent = ''; loadFriends();
+    } catch (e) { msg.textContent = '팔로우하지 못했어요. ' + (e.message || ''); }
+  };
+  $('#fa').onclick = add; $('#fn').onkeydown = e => { if (e.key === 'Enter') add(); };
+  loadFriends();
+}
+
+async function loadFriends(){
+  const today = ymd(new Date());
+  try {
+    const fl = await api.following(me.id);
+    const ask = 'Notification' in window && Notification.permission === 'default';
+    $('#fl').innerHTML = (fl.length ? `<div class="chips">${fl.map(f => `<span class="chip">${esc(f.nickname)}<button class="x" data-id="${f.id}" aria-label="팔로우 취소">×</button></span>`).join('')}</div>` : '')
+      + (ask ? '<button class="more" id="np" style="margin-top:12px">브라우저 알림 켜기</button>' : '');
+    $('#fl').querySelectorAll('.x').forEach(b => b.onclick = async () => { await api.unfollow(me.id, b.dataset.id); loadFriends(); });
+    if ($('#np')) $('#np').onclick = () => Notification.requestPermission().then(loadFriends);
+    const rows = await api.friendFeed(), hs = await api.hearts('post', rows.filter(r => r.unlocked).map(r => r.id));
+    $('#ff').innerHTML = rows.map(r => {
+      const head = `<span class="av">${esc([...r.nickname][0])}</span><div class="t"><b>${esc(r.nickname)}</b> <small style="color:var(--mute)">${KL[r.kind]}</small><span class="tp">${esc(topicOf(r))}</span>`;
+      if (r.unlocked) return `<div class="post">${head}${r.title ? `<strong>${esc(r.title)}</strong>` : ''}<p>${esc(r.body)}</p><div class="pr">${heartBtn('post', r.id, hs)}</div></div></div>`;
+      const can = r.kind !== 'diary' || r.prompt_key === today;
+      return `<div class="post lock">${head}<p>🔒 나도 답하면 볼 수 있어요</p>${can ? `<div class="pr"><button class="go" data-k="${r.kind}" data-key="${esc(r.prompt_key)}">답하러 가기</button></div>` : ''}</div></div>`;
+    }).join('');
+    bindHearts($('#ff'));
+    $('#ff').querySelectorAll('.go').forEach(b => b.onclick = () => {
+      const k = b.dataset.k;
+      if (k === 'diary') { dsub = 'pub'; ds = ymd(new Date()); dm = null; tab = 'diary'; }
+      else { idx[k] = (k === 'write' ? WRITE : CONTEST).findIndex(x => x.k === b.dataset.key); tab = k; }
+      shell();
+    });
+    await api.readAll(me.id); unread = 0; paintBadge();
+  } catch (e) { $('#ff').innerHTML = '<div class="msg">불러오지 못했어요.</div>'; }
+}
+
 function boxView(){
-  const ids = [...savedIds];
-  $('#view').innerHTML = ids.map(i => `<button class="item" data-i="${i}"><span class="th" style="background:${CARDS[i].c}">${CARDS[i].e}</span><span><b>${esc(CARDS[i].t)}</b><small>${esc(CARDS[i].cat)}</small></span></button>`).join('');
-  document.querySelectorAll('.item').forEach(b => b.onclick = () => { idx.learn = +b.dataset.i; tab = 'learn'; shell(); });
+  const cards = [...savedIds], head = t => `<div class="meta dh">${t}</div>`;
+  const prompts = [...spSet].map(x => { const [kind, key] = x.split(':'), list = kind === 'write' ? WRITE : CONTEST, i = list.findIndex(p => p.k === key); return i < 0 ? null : { kind, i, it: list[i] }; }).filter(Boolean);
+  const pItems = k => prompts.filter(p => p.kind === k).map(p => `<button class="item" data-k="${p.kind}" data-i="${p.i}"><span class="th" style="background:var(--chip)">${k === 'write' ? '✍️' : '🏆'}</span><span><b>${esc([...p.it.p].slice(0, 34).join(''))}…</b><small>${esc(k === 'write' ? p.it.len : p.it.h)}</small></span></button>`).join('');
+  const w = pItems('write'), c = pItems('contest');
+  $('#view').innerHTML = (cards.length ? head('학습 카드') + cards.map(i => `<button class="item" data-c="${i}"><span class="th" style="background:${CARDS[i].c}">${CARDS[i].e}</span><span><b>${esc(CARDS[i].t)}</b><small>${esc(CARDS[i].cat)}</small></span></button>`).join('') : '')
+    + (w ? head('창작') + w : '') + (c ? head('공모') + c : '');
+  document.querySelectorAll('.item').forEach(b => b.onclick = () => {
+    if (b.dataset.c) { idx.learn = +b.dataset.c; tab = 'learn'; } else { idx[b.dataset.k] = +b.dataset.i; tab = b.dataset.k; }
+    shell();
+  });
 }
 
 boot();
