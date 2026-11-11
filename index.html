@@ -96,6 +96,14 @@ main{padding-bottom:104px}
 .tp{display:block;font-size:12px;color:var(--mute);margin-top:2px}
 .lock p{color:var(--mute)}
 .go{text-decoration:underline}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;z-index:30}
+.sheet .card{width:100%;max-width:480px;background:var(--bg);border-radius:20px 20px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;text-align:center}
+.sheet .card h3{margin:0}
+.sheet .btn[disabled]{opacity:.5}
+.av.big{width:56px;height:56px;font-size:22px;margin:0 auto}
+.pf{cursor:pointer}
+.req{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.req .btn{height:34px;padding:0 14px;font-size:14px;margin-left:6px}
 </style>
 </head>
 <body>
@@ -317,12 +325,15 @@ const api = LIVE ? {
   async unlock(u, n){ const { error } = await sb.auth.updateUser({ password: (await cred(n)).password }); if (error) throw error; await sb.from('profiles').update({ locked: false }).eq('id', u); },
   async logout(){ await sb.auth.signOut(); },
   async findUser(n){ const { data } = await sb.from('profiles').select('id,nickname').ilike('nickname', n.replace(/[%_\\]/g, '\\$&')).maybeSingle(); return data; },
-  async follow(u, f){ const { error } = await sb.from('follows').insert({ follower: u, followee: f }); if (error && error.code !== '23505') throw error; },
-  async unfollow(u, f){ await sb.from('follows').delete().match({ follower: u, followee: f }); },
-  async following(u){
-    const { data } = await sb.from('follows').select('followee').eq('follower', u); const ids = (data || []).map(r => r.followee); if (!ids.length) return [];
-    const { data: p } = await sb.from('profiles').select('id,nickname').in('id', ids); return p || [];
+  async friendships(u){
+    const { data } = await sb.from('friendships').select('requester,addressee,status').or(`requester.eq.${u},addressee.eq.${u}`);
+    const rows = data || [], other = r => r.requester === u ? r.addressee : r.requester, ids = [...new Set(rows.map(other))], names = {};
+    if (ids.length) { const { data: p } = await sb.from('profiles').select('id,nickname').in('id', ids); (p || []).forEach(x => names[x.id] = x.nickname); }
+    return rows.map(r => ({ id: other(r), nickname: names[other(r)] || '?', status: r.status, incoming: r.addressee === u }));
   },
+  async request(u, f){ const { error } = await sb.from('friendships').insert({ requester: u, addressee: f, status: 'pending' }); if (error) throw error; },
+  async accept(u, f){ await sb.from('friendships').update({ status: 'accepted' }).match({ requester: f, addressee: u }); },
+  async unfriend(u, f){ await sb.from('friendships').delete().or(`and(requester.eq.${u},addressee.eq.${f}),and(requester.eq.${f},addressee.eq.${u})`); },
   async friendFeed(){ const { data, error } = await sb.rpc('friend_feed'); if (error) throw error; return data || []; },
   async notifs(u){ const { data } = await sb.from('notifs').select('*').eq('user_id', u).eq('read', false).order('created_at', { ascending: false }).limit(30); return data || []; },
   async readAll(u){ await sb.from('notifs').update({ read: true }).eq('user_id', u).eq('read', false); },
@@ -364,11 +375,16 @@ const api = LIVE ? {
   async unlock(u, n){ const us = ls.get('geul_users') || {}; us[n.toLowerCase()] = { nick: n, locked: false }; ls.set('geul_users', us); },
   async logout(){ ls.set('geul_me', null); },
   async findUser(n){ const u = (ls.get('geul_users') || {})[n.toLowerCase()]; return u ? { id: 'l:' + n.toLowerCase(), nickname: u.nick } : null; },
-  async follow(u, f){ const us = ls.get('geul_users') || {}, k = f.slice(2), a = ls.get('geul_fol_' + u) || []; if (!a.some(x => x.id === f)) a.push({ id: f, nickname: us[k] ? us[k].nick : k }); ls.set('geul_fol_' + u, a); },
-  async unfollow(u, f){ ls.set('geul_fol_' + u, (ls.get('geul_fol_' + u) || []).filter(x => x.id !== f)); },
-  async following(u){ return ls.get('geul_fol_' + u) || []; },
+  async friendships(u){
+    const us = ls.get('geul_users') || {};
+    return (ls.get('geul_fr') || []).filter(r => r.requester === u || r.addressee === u).map(r => { const o = r.requester === u ? r.addressee : r.requester, k = o.slice(2); return { id: o, nickname: us[k] ? us[k].nick : k, status: r.status, incoming: r.addressee === u }; });
+  },
+  async request(u, f){ const a = ls.get('geul_fr') || []; if (a.some(r => (r.requester === u && r.addressee === f) || (r.requester === f && r.addressee === u))) throw { code: '23505' }; a.push({ requester: u, addressee: f, status: 'pending' }); ls.set('geul_fr', a); },
+  async accept(u, f){ ls.set('geul_fr', (ls.get('geul_fr') || []).map(r => r.requester === f && r.addressee === u ? { ...r, status: 'accepted' } : r)); },
+  async unfriend(u, f){ ls.set('geul_fr', (ls.get('geul_fr') || []).filter(r => !((r.requester === u && r.addressee === f) || (r.requester === f && r.addressee === u)))); },
   async friendFeed(){
-    const m = ls.get('geul_me'), ids = (ls.get('geul_fol_' + m.id) || []).map(x => x.id), all = ls.get('geul_posts') || [];
+    const m = ls.get('geul_me'), all = ls.get('geul_posts') || [];
+    const ids = (ls.get('geul_fr') || []).filter(r => r.status === 'accepted' && (r.requester === m.id || r.addressee === m.id)).map(r => r.requester === m.id ? r.addressee : r.requester);
     return all.filter(p => ids.includes(p.user_id)).sort((a, b) => b.id - a.id).map(p => {
       const ok = all.some(x => x.user_id === m.id && x.kind === p.kind && x.prompt_key === p.prompt_key);
       return ok ? { ...p, unlocked: true } : { ...p, title: null, body: null, unlocked: false };
@@ -460,7 +476,10 @@ function loginView(){
   $('#nick').onkeydown = $('#pw').onkeydown = e => { if (e.key === 'Enter') go(); };
 }
 
-function shell(){
+const snap = () => ({ tab, dsub, rm, ds });
+const pushNav = () => history.pushState(snap(), '');
+window.addEventListener('popstate', e => { if (!me) return; const st = e.state; if (st) { tab = st.tab; dsub = st.dsub; rm = st.rm; ds = st.ds; dm = null; } shell(false); });
+function shell(push = true){
   const tabs = [['learn','학습'],['write','창작'],['contest','공모'],['diary','일기'],['friend','친구'],['box','보관함']];
   $app.innerHTML = `<header><span class="logo">GEUL</span><span class="who"><button class="out" id="out">로그아웃</button><button class="av" id="me" title="${esc(me.nickname)}" aria-label="내 정보">${esc([...me.nickname][0])}</button></span></header>
   <div class="tabs">${tabs.map(([k, n]) => `<button data-t="${k}" aria-current="${k === tab}">${n}</button>`).join('')}</div><main id="view"></main>`;
@@ -470,6 +489,7 @@ function shell(){
   $('#out').onclick = async () => { if (me.guest && !confirm('게스트 계정은 로그아웃하면 다시 들어올 수 없어요. 나갈까요?')) return; stopPoll(); try { await api.logout(); } catch (e) {} me = null; dm = ds = rm = null; idx = { learn: -1, write: -1, contest: -1 }; loginView(); };
   ({ learn: learnView, write: () => promptView('write', WRITE), contest: () => promptView('contest', CONTEST), diary: diaryTab, friend: friendView, box: boxView, me: settingsView })[tab]();
   scrollTo(0, 0);
+  if (push) { if (!history.state) history.replaceState(snap(), ''); else if (JSON.stringify(history.state) !== JSON.stringify(snap())) pushNav(); }
 }
 
 function settingsView(){
@@ -548,7 +568,7 @@ async function loadFeed(kind, key, el, skipMine){
   try {
     let rows = await api.posts(kind, key); if (skipMine) rows = rows.filter(p => p.user_id !== me.id);
     const hs = await api.hearts('post', rows.map(p => p.id));
-    el.innerHTML = rows.map(p => `<div class="post"><span class="av">${esc([...p.nickname][0])}</span><div class="t"><b>${esc(p.nickname)}</b>
+    el.innerHTML = rows.map(p => `<div class="post"><span class="av pf" data-u="${p.user_id}" data-n="${esc(p.nickname)}">${esc([...p.nickname][0])}</span><div class="t"><b class="pf" data-u="${p.user_id}" data-n="${esc(p.nickname)}">${esc(p.nickname)}</b>
       ${p.title ? `<strong>${esc(p.title)}</strong>` : ''}<p>${esc(p.body)}</p><div class="pr">${heartBtn('post', p.id, hs)}${p.user_id === me.id ? `<button data-del="${p.id}">삭제</button>` : ''}</div></div></div>`).join('');
     bindHearts(el);
     el.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { await api.del(b.dataset.del); loadFeed(kind, key, el, skipMine); });
@@ -601,11 +621,11 @@ async function roomView(){
     const enter = async () => {
       const code = $('#rc').value.trim(), msg = $('#msg');
       if (code.length < 2) { msg.textContent = '방 코드는 2자 이상이어야 해요.'; return; }
-      try { const id = await roomId(code); await api.joinRoom(me.id, id, code); rm = { room_id: id, label: code }; roomView(); }
+      try { const id = await roomId(code); await api.joinRoom(me.id, id, code); rm = { room_id: id, label: code }; pushNav(); roomView(); }
       catch (e) { msg.textContent = '입장하지 못했어요. ' + (e.message || ''); }
     };
     $('#rj').onclick = enter; $('#rc').onkeydown = e => { if (e.key === 'Enter') enter(); };
-    v.querySelectorAll('.item').forEach(b => b.onclick = () => { rm = { room_id: b.dataset.r, label: b.dataset.l }; roomView(); });
+    v.querySelectorAll('.item').forEach(b => b.onclick = () => { rm = { room_id: b.dataset.r, label: b.dataset.l }; pushNav(); roomView(); });
     return;
   }
   let file = null;
@@ -613,10 +633,10 @@ async function roomView(){
     <textarea id="body" maxlength="5000" placeholder="오늘의 이야기" aria-label="일기"></textarea><img class="pv" id="pv" alt="" hidden>
     <div class="act"><label class="btn" style="display:grid;place-items:center;cursor:pointer">사진<input type="file" id="ph" accept="image/*" hidden></label><button class="btn main" id="rp">기록</button></div>
     <div class="msg" id="msg"></div><div id="rf"></div>`;
-  $('#bk').onclick = () => { rm = null; roomView(); };
+  $('#bk').onclick = () => { rm = null; pushNav(); roomView(); };
   $('#lv').onclick = async () => {
     if (!confirm('이 방에서 나갈까요? 다시 들어오려면 방 코드가 필요해요.')) return;
-    try { await api.leaveRoom(me.id, rm.room_id); } catch (e) {} rm = null; roomView();
+    try { await api.leaveRoom(me.id, rm.room_id); } catch (e) {} rm = null; history.replaceState(snap(), ''); roomView();
   };
   $('#ph').onchange = e => { file = e.target.files[0] || null; const pv = $('#pv'); pv.hidden = !file; if (file) pv.src = URL.createObjectURL(file); };
   $('#rp').onclick = async () => {
@@ -640,7 +660,7 @@ async function loadRoomFeed(){
     let last = '';
     el.innerHTML = rows.map(p => {
       const head = p.day !== last ? `<div class="meta dh">${fmt(p.day)}</div>` : ''; last = p.day;
-      return head + `<div class="post"><span class="av">${esc([...p.nickname][0])}</span><div class="t"><b>${esc(p.nickname)}</b>${p.body ? `<p>${esc(p.body)}</p>` : ''}
+      return head + `<div class="post"><span class="av pf" data-u="${p.user_id}" data-n="${esc(p.nickname)}">${esc([...p.nickname][0])}</span><div class="t"><b class="pf" data-u="${p.user_id}" data-n="${esc(p.nickname)}">${esc(p.nickname)}</b>${p.body ? `<p>${esc(p.body)}</p>` : ''}
         ${p.image_path && urls[p.image_path] ? `<img class="ph" src="${urls[p.image_path]}" alt="첨부 사진" loading="lazy">` : ''}
         <div class="pr">${heartBtn('room', p.id, hs)}${p.user_id === me.id ? `<button data-del="${p.id}">삭제</button>` : ''}</div></div></div>`;
     }).join('');
@@ -652,7 +672,7 @@ async function loadRoomFeed(){
 let dsub = 'pub', unread = 0, seenN = new Set(), pollT = null;
 function diaryTab(){
   $('#view').innerHTML = `<div class="seg">${[['pub','공개 일기'],['room','비공개 방']].map(([k, n]) => `<button data-s="${k}" aria-current="${k === dsub}">${n}</button>`).join('')}</div><div id="sub"></div>`;
-  document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { dsub = b.dataset.s; diaryTab(); });
+  document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { dsub = b.dataset.s; pushNav(); diaryTab(); });
   dsub === 'pub' ? diaryView() : roomView();
 }
 
@@ -671,7 +691,7 @@ async function poll(first){
     const rows = await api.notifs(me.id), fresh = rows.filter(r => !seenN.has(r.id));
     rows.forEach(r => seenN.add(r.id)); unread = rows.length; paintBadge();
     if (!first && fresh.length) {
-      const r = fresh[0], txt = `${r.actor_name}님이 ${r.kind === 'diary' ? '일기를' : '새 글을'} 썼어요${fresh.length > 1 ? ` 외 ${fresh.length - 1}건` : ''}`;
+      const r = fresh[0], what = { request: '친구 요청을 보냈어요', accepted: '친구 요청을 수락했어요', diary: '일기를 썼어요' }[r.kind] || '새 글을 썼어요', txt = `${r.actor_name}님이 ${what}${fresh.length > 1 ? ` 외 ${fresh.length - 1}건` : ''}`;
       toast(txt);
       if ('Notification' in window && Notification.permission === 'granted' && document.hidden) { try { new Notification('GEUL', { body: txt }); } catch (e) {} }
     }
@@ -685,8 +705,8 @@ const KL = { write: '창작', contest: '공모', diary: '일기' };
 const topicOf = p => { if (p.kind === 'diary') return fmt(p.prompt_key); const it = (p.kind === 'write' ? WRITE : CONTEST).find(x => x.k === p.prompt_key); return it ? [...it.p].slice(0, 36).join('') + '…' : ''; };
 
 function friendView(){
-  $('#view').innerHTML = `<input class="ttl" id="fn" maxlength="12" placeholder="친구 닉네임" aria-label="친구 닉네임" autocomplete="off">
-    <div class="act"><button class="btn main" id="fa">팔로우</button></div><div class="msg" id="msg"></div>
+  $('#view').innerHTML = `<input class="ttl" id="fn" maxlength="12" placeholder="닉네임으로 친구 요청" aria-label="친구 닉네임" autocomplete="off">
+    <div class="act"><button class="btn main" id="fa">친구 요청</button></div><div class="msg" id="msg"></div>
     <div id="fl"></div><div class="feed" id="ff"></div>`;
   const add = async () => {
     const n = $('#fn').value.trim(), msg = $('#msg');
@@ -694,9 +714,11 @@ function friendView(){
     try {
       const u = await api.findUser(n);
       if (!u) { msg.textContent = '그 닉네임은 찾을 수 없어요.'; return; }
-      if (u.id === me.id) { msg.textContent = '나는 팔로우할 수 없어요.'; return; }
-      await api.follow(me.id, u.id); $('#fn').value = ''; msg.textContent = ''; loadFriends();
-    } catch (e) { msg.textContent = '팔로우하지 못했어요. ' + (e.message || ''); }
+      if (u.id === me.id) { msg.textContent = '나에게는 요청할 수 없어요.'; return; }
+      const rel = (await api.friendships(me.id)).find(f => f.id === u.id);
+      if (rel) { msg.textContent = rel.status === 'accepted' ? '이미 친구예요.' : rel.incoming ? '상대가 먼저 요청을 보냈어요. 아래에서 수락해 주세요.' : '이미 요청을 보냈어요.'; return; }
+      await api.request(me.id, u.id); $('#fn').value = ''; msg.textContent = '요청을 보냈어요.'; loadFriends();
+    } catch (e) { msg.textContent = '요청하지 못했어요. ' + (e.message || ''); }
   };
   $('#fa').onclick = add; $('#fn').onkeydown = e => { if (e.key === 'Enter') add(); };
   loadFriends();
@@ -705,29 +727,56 @@ function friendView(){
 async function loadFriends(){
   const today = ymd(new Date());
   try {
-    const fl = await api.following(me.id);
+    const all = await api.friendships(me.id);
+    const inc = all.filter(f => f.status === 'pending' && f.incoming), out = all.filter(f => f.status === 'pending' && !f.incoming), fr = all.filter(f => f.status === 'accepted');
+    const chip = (f, suf) => `<span class="chip">${esc(f.nickname)}${suf}<button class="x" data-id="${f.id}" data-s="${f.status}" aria-label="삭제">×</button></span>`;
     const ask = 'Notification' in window && Notification.permission === 'default';
-    $('#fl').innerHTML = (fl.length ? `<div class="chips">${fl.map(f => `<span class="chip">${esc(f.nickname)}<button class="x" data-id="${f.id}" aria-label="팔로우 취소">×</button></span>`).join('')}</div>` : '')
+    $('#fl').innerHTML = inc.map(f => `<div class="req"><b>${esc(f.nickname)}</b><span><button class="btn main ok" data-id="${f.id}">수락</button><button class="btn no" data-id="${f.id}">거절</button></span></div>`).join('')
+      + (fr.length || out.length ? `<div class="chips">${fr.map(f => chip(f, '')).join('')}${out.map(f => chip(f, ' · 대기')).join('')}</div>` : '')
       + (ask ? '<button class="more" id="np" style="margin-top:12px">브라우저 알림 켜기</button>' : '');
-    $('#fl').querySelectorAll('.x').forEach(b => b.onclick = async () => { await api.unfollow(me.id, b.dataset.id); loadFriends(); });
+    const L = $('#fl');
+    L.querySelectorAll('.ok').forEach(b => b.onclick = async () => { await api.accept(me.id, b.dataset.id); loadFriends(); });
+    L.querySelectorAll('.no').forEach(b => b.onclick = async () => { await api.unfriend(me.id, b.dataset.id); loadFriends(); });
+    L.querySelectorAll('.x').forEach(b => b.onclick = async () => { if (b.dataset.s === 'accepted' && !confirm('친구를 끊을까요?')) return; await api.unfriend(me.id, b.dataset.id); loadFriends(); });
     if ($('#np')) $('#np').onclick = () => Notification.requestPermission().then(loadFriends);
     const rows = await api.friendFeed(), hs = await api.hearts('post', rows.filter(r => r.unlocked).map(r => r.id));
     $('#ff').innerHTML = rows.map(r => {
-      const head = `<span class="av">${esc([...r.nickname][0])}</span><div class="t"><b>${esc(r.nickname)}</b> <small style="color:var(--mute)">${KL[r.kind]}</small><span class="tp">${esc(topicOf(r))}</span>`;
-      if (r.unlocked) return `<div class="post">${head}${r.title ? `<strong>${esc(r.title)}</strong>` : ''}<p>${esc(r.body)}</p><div class="pr">${heartBtn('post', r.id, hs)}</div></div></div>`;
+      const head = `<span class="av pf" data-u="${r.user_id}" data-n="${esc(r.nickname)}">${esc([...r.nickname][0])}</span><div class="t"><b class="pf" data-u="${r.user_id}" data-n="${esc(r.nickname)}">${esc(r.nickname)}</b> <small style="color:var(--mute)">${KL[r.kind]}</small><span class="tp">${esc(topicOf(r))}</span>`;
+      const go = (t) => `<button class="go" data-k="${r.kind}" data-key="${esc(r.prompt_key)}">${t}</button>`;
+      if (r.unlocked) return `<div class="post">${head}${r.title ? `<strong>${esc(r.title)}</strong>` : ''}<p>${esc(r.body)}</p><div class="pr">${heartBtn('post', r.id, hs)}${go('글 보러가기')}</div></div></div>`;
       const can = r.kind !== 'diary' || r.prompt_key === today;
-      return `<div class="post lock">${head}<p>🔒 나도 답하면 볼 수 있어요</p>${can ? `<div class="pr"><button class="go" data-k="${r.kind}" data-key="${esc(r.prompt_key)}">답하러 가기</button></div>` : ''}</div></div>`;
+      return `<div class="post lock">${head}<p>🔒 나도 답하면 볼 수 있어요</p>${can ? `<div class="pr">${go('답하러 가기')}</div>` : ''}</div></div>`;
     }).join('');
     bindHearts($('#ff'));
     $('#ff').querySelectorAll('.go').forEach(b => b.onclick = () => {
       const k = b.dataset.k;
-      if (k === 'diary') { dsub = 'pub'; ds = ymd(new Date()); dm = null; tab = 'diary'; }
+      if (k === 'diary') { dsub = 'pub'; ds = b.dataset.key; dm = null; tab = 'diary'; }
       else { idx[k] = (k === 'write' ? WRITE : CONTEST).findIndex(x => x.k === b.dataset.key); tab = k; }
       shell();
     });
     await api.readAll(me.id); unread = 0; paintBadge();
   } catch (e) { $('#ff').innerHTML = '<div class="msg">불러오지 못했어요.</div>'; }
 }
+
+async function openProfile(id, nick){
+  if (!me || id === me.id) return;
+  let all = []; try { all = await api.friendships(me.id); } catch (e) {}
+  const rel = all.find(f => f.id === id);
+  let st = !rel ? 'none' : rel.status === 'accepted' ? 'friend' : rel.incoming ? 'incoming' : 'sent';
+  const el = document.createElement('div'); el.className = 'sheet'; el.onclick = e => { if (e.target === el) el.remove(); };
+  const paint = () => {
+    const lab = { none: '친구 요청', sent: '요청 보냄', incoming: '요청 수락', friend: '친구' }[st];
+    el.innerHTML = `<div class="card"><span class="av big">${esc([...nick][0])}</span><h3>${esc(nick)}</h3><div class="msg" id="sm"></div>
+      <button class="btn main" id="sa" ${st === 'sent' || st === 'friend' ? 'disabled' : ''}>${lab}</button>
+      ${st === 'friend' || st === 'sent' ? `<button class="btn" id="sx">${st === 'friend' ? '친구 끊기' : '요청 취소'}</button>` : ''}<button class="btn" id="sc">닫기</button></div>`;
+    $('#sc').onclick = () => el.remove();
+    const done = () => { paint(); if (tab === 'friend') loadFriends(); };
+    $('#sa').onclick = async () => { try { if (st === 'none') { await api.request(me.id, id); st = 'sent'; } else if (st === 'incoming') { await api.accept(me.id, id); st = 'friend'; } done(); } catch (e) { $('#sm').textContent = '처리하지 못했어요.'; } };
+    if ($('#sx')) $('#sx').onclick = async () => { if (st === 'friend' && !confirm('친구를 끊을까요?')) return; try { await api.unfriend(me.id, id); st = 'none'; done(); } catch (e) { $('#sm').textContent = '처리하지 못했어요.'; } };
+  };
+  document.body.appendChild(el); paint();
+}
+document.addEventListener('click', e => { const t = e.target.closest('.pf'); if (t && t.dataset.u) openProfile(t.dataset.u, t.dataset.n); });
 
 function boxView(){
   const cards = [...savedIds], head = t => `<div class="meta dh">${t}</div>`;
